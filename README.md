@@ -148,6 +148,184 @@ visually-conditioned language models; while you can use this repo to train VLMs 
 language (via `scripts/generate.py`) with existing OpenVLA models will not work (as we only train current OpenVLA models
 to generate actions, and actions alone).
 
+## Devcontainer (English)
+
+We provide a Dev Containers setup under `.devcontainer/` for a reproducible CUDA 12.4 + conda environment.
+
+Prerequisites:
+- Docker (or Docker Desktop)
+- VS Code with the Dev Containers extension
+- NVIDIA GPU + NVIDIA Container Toolkit (for `--gpus=all`)
+
+Steps:
+1. Open the repository in VS Code.
+2. Run "Dev Containers: Reopen in Container".
+3. Wait for the container to build and for `.devcontainer/postCreate.sh` to finish.
+
+Notes:
+- The post-create script installs PyTorch (CUDA 12.4), creates/activates the `openvla` conda env, installs the repo
+  editable, and attempts to install `flash-attn`.
+- If `flash-attn` fails to install, you can still run without it.
+- To verify the environment after the container starts, run the checks below:
+
+  0) Confirm the active conda env is `openvla`:
+     ```bash
+     which python
+     python -V
+     python -c "import sys; print(sys.executable)"
+     ```
+  1) Confirm the GPU is visible:
+     ```bash
+     nvidia-smi
+     ```
+  2) Confirm PyTorch + CUDA work:
+     ```bash
+     python - <<'PY'
+     import torch
+     print("torch:", torch.__version__)
+     print("cuda available:", torch.cuda.is_available())
+     print("cuda version:", torch.version.cuda)
+     print("gpu:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else None)
+     PY
+     ```
+  3) Confirm `flash-attn` import (optional; recommended for training/fast inference):
+     ```bash
+     python - <<'PY'
+     try:
+         import flash_attn
+         print("flash_attn:", flash_attn.__version__)
+     except Exception as e:
+         print("flash_attn: NOT AVAILABLE ->", repr(e))
+     PY
+     ```
+  4) Log key package versions (for reproducibility):
+     ```bash
+     python - <<'PY'
+     import torch, transformers, tokenizers, timm
+     print("torch:", torch.__version__)
+     print("transformers:", transformers.__version__)
+     print("tokenizers:", tokenizers.__version__)
+     print("timm:", timm.__version__)
+     PY
+     ```
+  5) OpenVLA load + inference (final check). The first run downloads the model from HuggingFace:
+     ```bash
+     python - <<'PY'
+     from transformers import AutoModelForVision2Seq, AutoProcessor
+     from PIL import Image
+     import torch
+
+     device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+     processor = AutoProcessor.from_pretrained("openvla/openvla-7b", trust_remote_code=True)
+     model = AutoModelForVision2Seq.from_pretrained(
+         "openvla/openvla-7b",
+         attn_implementation="flash_attention_2",
+         torch_dtype=torch.bfloat16,
+         low_cpu_mem_usage=True,
+         trust_remote_code=True,
+     ).to(device)
+
+     img = Image.new("RGB", (224, 224), (0, 0, 0))
+     prompt = "In: What action should the robot take to pick up the object?\\nOut:"
+
+     inputs = processor(prompt, img, return_tensors="pt").to(device, dtype=torch.bfloat16)
+     with torch.no_grad():
+         action = model.predict_action(**inputs, unnorm_key="bridge_orig", do_sample=False)
+
+     print("action:", action)
+     PY
+     ```
+
+## Devcontainer (日本語)
+
+`.devcontainer/` に CUDA 12.4 + conda 環境の Dev Containers 設定があります。
+
+前提:
+- Docker (または Docker Desktop)
+- VS Code + Dev Containers 拡張
+- NVIDIA GPU + NVIDIA Container Toolkit (`--gpus=all` を使うため)
+
+手順:
+1. VS Code でこのリポジトリを開きます。
+2. "Dev Containers: Reopen in Container" を実行します。
+3. コンテナのビルドと `.devcontainer/postCreate.sh` の完了を待ちます。
+
+補足:
+- postCreate スクリプトが PyTorch (CUDA 12.4) をインストールし、`openvla` の conda 環境を作成/有効化し、
+  リポジトリを editable インストールし、`flash-attn` の導入を試みます。
+- `flash-attn` のインストールに失敗しても、なしで動作します。
+- 動作確認（コンテナ起動後）は以下の通りです:
+
+  0) conda 環境が `openvla` になっているか:
+     ```bash
+     which python
+     python -V
+     python -c "import sys; print(sys.executable)"
+     ```
+  1) GPU が見えているか:
+     ```bash
+     nvidia-smi
+     ```
+  2) PyTorch + CUDA が正しく使えるか:
+     ```bash
+     python - <<'PY'
+     import torch
+     print("torch:", torch.__version__)
+     print("cuda available:", torch.cuda.is_available())
+     print("cuda version:", torch.version.cuda)
+     print("gpu:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else None)
+     PY
+     ```
+  3) `flash-attn` が import できるか（任意：学習や高速推論で推奨）:
+     ```bash
+     python - <<'PY'
+     try:
+         import flash_attn
+         print("flash_attn:", flash_attn.__version__)
+     except Exception as e:
+         print("flash_attn: NOT AVAILABLE ->", repr(e))
+     PY
+     ```
+  4) 主要パッケージのバージョン確認（再現性ログ用）:
+     ```bash
+     python - <<'PY'
+     import torch, transformers, tokenizers, timm
+     print("torch:", torch.__version__)
+     print("transformers:", transformers.__version__)
+     print("tokenizers:", tokenizers.__version__)
+     print("timm:", timm.__version__)
+     PY
+     ```
+  5) OpenVLA のロード＆推論（最終確認）。初回は HuggingFace からモデルをダウンロードします:
+     ```bash
+     python - <<'PY'
+     from transformers import AutoModelForVision2Seq, AutoProcessor
+     from PIL import Image
+     import torch
+
+     device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+     processor = AutoProcessor.from_pretrained("openvla/openvla-7b", trust_remote_code=True)
+     model = AutoModelForVision2Seq.from_pretrained(
+         "openvla/openvla-7b",
+         attn_implementation="flash_attention_2",
+         torch_dtype=torch.bfloat16,
+         low_cpu_mem_usage=True,
+         trust_remote_code=True,
+     ).to(device)
+
+     img = Image.new("RGB", (224, 224), (0, 0, 0))
+     prompt = "In: What action should the robot take to pick up the object?\\nOut:"
+
+     inputs = processor(prompt, img, return_tensors="pt").to(device, dtype=torch.bfloat16)
+     with torch.no_grad():
+         action = model.predict_action(**inputs, unnorm_key="bridge_orig", do_sample=False)
+
+     print("action:", action)
+     PY
+     ```
+
 ## Fine-Tuning OpenVLA via LoRA
 
 **(2025-03-03 Update: We recommend trying the new OFT recipe for fine-tuning OpenVLA to produce faster and more successful policies. See project website [here](https://openvla-oft.github.io/).)**
