@@ -1,8 +1,11 @@
 {
-  "name": "openvla (CUDA 12.4, conda)",
+  "name": "openvla (DGX Spark arm64)",
   "build": {
     "dockerfile": "Dockerfile",
-    "context": "."
+    "context": ".",
+    "args": {
+      "BASE_IMAGE": "nvidia/cuda:13.0.0-cudnn-devel-ubuntu24.04"
+    }
   },
   "runArgs": [
     "--gpus=all",
@@ -11,7 +14,10 @@
   ],
   "containerEnv": {
     "NVIDIA_VISIBLE_DEVICES": "all",
-    "NVIDIA_DRIVER_CAPABILITIES": "compute,utility"
+    "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
+    "HF_HOME": "/workspaces/.cache/huggingface",
+    "TRANSFORMERS_CACHE": "/workspaces/.cache/huggingface",
+    "HF_HUB_ENABLE_HF_TRANSFER": "1"
   },
   "remoteUser": "vscode",
   "postCreateCommand": "bash .devcontainer/postCreate.sh",
